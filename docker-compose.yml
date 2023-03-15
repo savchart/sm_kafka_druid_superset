@@ -1,0 +1,198 @@
+version: '3'
+
+volumes:
+  metadata_data: {}
+  middle_var: {}
+  historical_var: {}
+  broker_var: {}
+  coordinator_var: {}
+  router_var: {}
+  druid_shared: {}
+  zookeeper_data:
+    driver: local
+  kafka_data:
+    driver: local
+
+
+services:
+  postgres:
+    container_name: postgres
+    image: postgres:latest
+    volumes:
+      - metadata_data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_PASSWORD=FoolishPassword
+      - POSTGRES_USER=druid
+      - POSTGRES_DB=druid
+    networks:
+      - zk-kafka-net
+
+  zookeeper:
+    container_name: zookeeper
+    image: docker.io/bitnami/zookeeper:3.8
+    ports:
+      - "2181:2181"
+    volumes:
+      - "zookeeper_data:/bitnami"
+    environment:
+      - ALLOW_ANONYMOUS_LOGIN=yes
+      - ZOO_MY_ID=1
+      - ZOO_SERVERS=server.1=zookeeper:2888:3888
+    networks:
+      - zk-kafka-net
+
+  kafka:
+    container_name: kafka
+    image: docker.io/bitnami/kafka:3.4
+    ports:
+      - "9092:9092"
+    volumes:
+      - "kafka_data:/bitnami"
+    environment:
+      - KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://kafka:9092
+      - KAFKA_CFG_ZOOKEEPER_CONNECT=zookeeper:2181
+      - KAFKA_CREATE_TOPICS="telegram-messages:1:1"
+      - ALLOW_PLAINTEXT_LISTENER=yes
+    depends_on:
+      zookeeper:
+        condition: service_started
+    networks:
+      - zk-kafka-net
+
+
+
+  coordinator:
+    image: apache/druid:25.0.0
+    container_name: coordinator
+    volumes:
+      - druid_shared:/opt/shared
+      - coordinator_var:/opt/druid/var
+    depends_on:
+      - postgres
+      - zookeeper
+    ports:
+      - "8081:8081"
+    command:
+      - coordinator
+    env_file:
+      - environment
+    networks:
+      - zk-kafka-net
+
+  broker:
+    image: apache/druid:25.0.0
+    container_name: broker
+    volumes:
+      - broker_var:/opt/druid/var
+    depends_on:
+      - zookeeper
+      - postgres
+      - coordinator
+    ports:
+      - "8082:8082"
+    command:
+      - broker
+    env_file:
+      - environment
+    networks:
+      - zk-kafka-net
+
+  historical:
+    image: apache/druid:25.0.0
+    container_name: historical
+    volumes:
+      - druid_shared:/opt/shared
+      - historical_var:/opt/druid/var
+    depends_on:
+      - zookeeper
+      - postgres
+      - coordinator
+    ports:
+      - "8083:8083"
+    command:
+      - historical
+    env_file:
+      - environment
+    networks:
+      - zk-kafka-net
+
+  middlemanager:
+    image: apache/druid:25.0.0
+    container_name: middlemanager
+    volumes:
+      - druid_shared:/opt/shared
+      - middle_var:/opt/druid/var
+    depends_on:
+      - zookeeper
+      - postgres
+      - coordinator
+    ports:
+      - "8091:8091"
+      - "8100-8105:8100-8105"
+    command:
+      - middleManager
+    env_file:
+      - environment
+    networks:
+      - zk-kafka-net
+
+  router:
+    image: apache/druid:25.0.0
+    container_name: router
+    volumes:
+      - router_var:/opt/druid/var
+    depends_on:
+      - zookeeper
+      - postgres
+      - coordinator
+    ports:
+      - "8888:8888"
+    command:
+      - router
+    env_file:
+      - environment
+    networks:
+      - zk-kafka-net
+
+  telegram-producer:
+      build: .
+      container_name: telegram-producer
+      depends_on:
+        kafka:
+          condition: service_started
+        broker:
+          condition: service_started
+        middlemanager:
+          condition: service_started
+        historical:
+            condition: service_started
+        router:
+            condition: service_started
+
+      environment:
+        KAFKA_TOPIC: "telegram-messages"
+        KAFKA_BROKER_URL: "kafka:9092"
+      env_file:
+        - .env
+      networks:
+        - zk-kafka-net
+
+#  superset:
+#    image: apache/superset:latest
+#    container_name: superset
+#    ports:
+#      - "8088:8088"
+#    environment:
+#      SUPERSET_LOAD_EXAMPLES: "yes"
+#      SUPERSET_SERVER_PORT: 8088
+#      SUPERSET_WEBDRIVER: None
+#      PYTHONUNBUFFERED: 1
+#    depends_on:
+#      - zookeeper
+#      - coordinator
+#    networks:
+#      - zk-kafka-net
+
+
+networks:
+  zk-kafka-net:
