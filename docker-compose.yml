@@ -1,16 +1,18 @@
 version: '3'
 
 volumes:
-  metadata_data: {}
-  middle_var: {}
-  historical_var: {}
-  broker_var: {}
-  coordinator_var: {}
-  router_var: {}
-  druid_shared: {}
+  metadata_data: { }
+  middle_var: { }
+  historical_var: { }
+  broker_var: { }
+  coordinator_var: { }
+  router_var: { }
+  druid_shared: { }
   zookeeper_data:
     driver: local
   kafka_data:
+    driver: local
+  superset_data:
     driver: local
 
 
@@ -58,8 +60,6 @@ services:
         condition: service_started
     networks:
       - zk-kafka-net
-
-
 
   coordinator:
     image: apache/druid:25.0.0
@@ -155,43 +155,33 @@ services:
       - zk-kafka-net
 
   telegram-producer:
-      build: .
-      container_name: telegram-producer
-      depends_on:
-        kafka:
-          condition: service_started
-        broker:
-          condition: service_started
-        middlemanager:
-          condition: service_started
-        historical:
-            condition: service_started
-        router:
-            condition: service_started
+    build: .
+    container_name: telegram-producer
+    depends_on:
+      kafka:
+        condition: service_started
+      broker:
+        condition: service_started
+      middlemanager:
+        condition: service_started
+      historical:
+        condition: service_started
+      router:
+        condition: service_started
+    env_file:
+      - .env
+    networks:
+      - zk-kafka-net
 
-      environment:
-        KAFKA_TOPIC: "telegram-messages"
-        KAFKA_BROKER_URL: "kafka:9092"
-      env_file:
-        - .env
-      networks:
-        - zk-kafka-net
-
-#  superset:
-#    image: apache/superset:latest
-#    container_name: superset
-#    ports:
-#      - "8088:8088"
-#    environment:
-#      SUPERSET_LOAD_EXAMPLES: "yes"
-#      SUPERSET_SERVER_PORT: 8088
-#      SUPERSET_WEBDRIVER: None
-#      PYTHONUNBUFFERED: 1
-#    depends_on:
-#      - zookeeper
-#      - coordinator
-#    networks:
-#      - zk-kafka-net
+  superset:
+    image: apache/superset:latest
+    container_name: superset
+    ports:
+      - "8088:8088"
+    env_file:
+      - env_superset
+    networks:
+      - zk-kafka-net
 
 
 networks:
