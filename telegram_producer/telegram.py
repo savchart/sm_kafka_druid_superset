@@ -7,12 +7,15 @@ from telethon.sync import TelegramClient, events
 from telethon.sessions import StringSession
 from telethon.tl.functions.messages import GetHistoryRequest
 
-from kafka import KafkaProducer, KafkaConsumer
+from kafka import KafkaProducer, KafkaConsumer, errors
 
+from telegram_utils import DateTimeEncoder, process_message, get_offset_id
+
+from dotenv import load_dotenv
+
+load_dotenv()
 project_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(project_dir)
-
-from utils.telegram_utils import DateTimeEncoder, process_message, get_offset_id
 
 api_id = int(os.getenv('API_ID'))
 api_hash = os.getenv('API_HASH')
@@ -28,33 +31,58 @@ async def main(kafka_topic_, kafka_bootstrap_servers_):
     my_channel = await client.get_entity(user_input_channel)
     limit = 100
 
-    producer = KafkaProducer(
-        bootstrap_servers=kafka_bootstrap_servers_,
-        value_serializer=lambda v: json.dumps(v, cls=DateTimeEncoder).encode('utf-8')
-    )
+    producer = None
+    consumer = None
+    retry_attempts = 5
+    retry_delay = 10
 
-    consumer = KafkaConsumer(
-        kafka_topic_,
-        group_id='my-group',
-        auto_offset_reset='latest',
-        enable_auto_commit=False,
-        bootstrap_servers=kafka_bootstrap_servers_,
-        value_deserializer=lambda x: json.loads(x.decode('utf-8')),
-    )
+    for _ in range(retry_attempts):
+        try:
+            producer = KafkaProducer(
+                bootstrap_servers=kafka_bootstrap_servers_,
+                value_serializer=lambda v: json.dumps(v, cls=DateTimeEncoder).encode('utf-8')
+            )
+            print("Connected to Kafka broker successfully.")
+            break
+        except errors.NoBrokersAvailable:
+            print("No brokers available. Retrying in {} seconds...".format(retry_delay))
+            time.sleep(retry_delay)
+    else:
+        print("Failed to connect to Kafka broker after {} attempts.".format(retry_attempts))
+        sys.exit(1)
+    print(f'Kafka producer created for {kafka_topic_} topic, {kafka_bootstrap_servers_} bootstrap servers')
 
-    min_id = get_offset_id(consumer)
+    for _ in range(retry_attempts):
+        try:
+            consumer = KafkaConsumer(
+                kafka_topic_,
+                group_id='my-group',
+                auto_offset_reset='latest',
+                enable_auto_commit=False,
+                bootstrap_servers=kafka_bootstrap_servers_,
+                value_deserializer=lambda x: json.loads(x.decode('utf-8')),
+            )
+            print("Connected to Kafka broker successfully.")
+            break
+        except errors.NoBrokersAvailable:
+            print("No brokers available. Retrying in {} seconds...".format(retry_delay))
+            time.sleep(retry_delay)
+    print(f'Kafka consumer created for {kafka_topic_} topic, {kafka_bootstrap_servers_} bootstrap servers')
+
+    last_processed_id = get_offset_id(consumer)
+    print(f'Last processed message id: {last_processed_id}')
     consumer.close()
 
     while True:
-        offset_id = min_id + limit + 1
         history = await client(GetHistoryRequest(
             peer=my_channel, max_id=0, limit=limit,
-            offset_id=offset_id, offset_date=None, add_offset=0,
-            min_id=min_id, hash=0
+            offset_id=last_processed_id + limit, offset_date=None, add_offset=0,
+            min_id=last_processed_id, hash=0
         ))
 
         if not history.messages:
-            time.sleep(600)
+            print('No messages, sleeping for 60 seconds...')
+            time.sleep(60)
             continue
         messages = history.messages[::-1]
         for message in messages:
@@ -65,7 +93,8 @@ async def main(kafka_topic_, kafka_bootstrap_servers_):
             except Exception as e:
                 print(f"Error sending message {message_kafka_dict['id']} to Kafka: {e}")
             producer.flush()
-        min_id += limit
+        last_processed_id = messages[-1].id
+        print(f'Last processed message id: {last_processed_id}')
 
     producer.close()
 
