@@ -23,9 +23,9 @@ services:
     volumes:
       - metadata_data:/var/lib/postgresql/data
     environment:
-      - POSTGRES_PASSWORD=FoolishPassword
-      - POSTGRES_USER=druid
-      - POSTGRES_DB=druid
+        - POSTGRES_DB=druid
+        - POSTGRES_USER=druid
+        - POSTGRES_PASSWORD=FoolishPassword
     networks:
       - zk-kafka-net
 
@@ -53,7 +53,7 @@ services:
     environment:
       - KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://kafka:9092
       - KAFKA_CFG_ZOOKEEPER_CONNECT=zookeeper:2181
-      - KAFKA_CREATE_TOPICS="telegram-messages:1:1"
+      - KAFKA_CREATE_TOPICS="telegram_messages:1:1"
       - ALLOW_PLAINTEXT_LISTENER=yes
     depends_on:
       zookeeper:
@@ -75,7 +75,7 @@ services:
     command:
       - coordinator
     env_file:
-      - environment
+      - env_druid
     networks:
       - zk-kafka-net
 
@@ -93,7 +93,7 @@ services:
     command:
       - broker
     env_file:
-      - environment
+      - env_druid
     networks:
       - zk-kafka-net
 
@@ -112,7 +112,7 @@ services:
     command:
       - historical
     env_file:
-      - environment
+      - env_druid
     networks:
       - zk-kafka-net
 
@@ -132,7 +132,7 @@ services:
     command:
       - middleManager
     env_file:
-      - environment
+      - env_druid
     networks:
       - zk-kafka-net
 
@@ -150,14 +150,18 @@ services:
     command:
       - router
     env_file:
-      - environment
+      - env_druid
     networks:
       - zk-kafka-net
 
   telegram-producer:
-    build: .
-    container_name: telegram-producer
+    build:
+      context: .
+      dockerfile: telegram_producer/Dockerfile
+    container_name: telegram_producer
     depends_on:
+      zookeeper:
+        condition: service_started
       kafka:
         condition: service_started
       broker:
@@ -168,6 +172,31 @@ services:
         condition: service_started
       router:
         condition: service_started
+
+    env_file:
+      - .env
+    networks:
+      - zk-kafka-net
+
+  ml-producer:
+    build:
+      context: .
+      dockerfile: ./ml_producer/Dockerfile
+    container_name: ml_producer
+    depends_on:
+      zookeeper:
+        condition: service_started
+      kafka:
+        condition: service_started
+      broker:
+        condition: service_started
+      middlemanager:
+        condition: service_started
+      historical:
+        condition: service_started
+      router:
+        condition: service_started
+
     env_file:
       - .env
     networks:
@@ -186,3 +215,4 @@ services:
 
 networks:
   zk-kafka-net:
+    driver: bridge
