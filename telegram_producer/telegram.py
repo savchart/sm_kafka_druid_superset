@@ -29,7 +29,7 @@ async def main(kafka_topic_, kafka_bootstrap_servers_):
     print(f'Client created for {me.username} and {user_input_channel} (channel)')
 
     my_channel = await client.get_entity(user_input_channel)
-    limit = 100
+    limit = 150
 
     producer = None
     consumer = None
@@ -70,7 +70,6 @@ async def main(kafka_topic_, kafka_bootstrap_servers_):
     print(f'Kafka consumer created for {kafka_topic_} topic, {kafka_bootstrap_servers_} bootstrap servers')
 
     last_processed_id = get_offset_id(consumer)
-    print(f'Last processed message id: {last_processed_id}')
     consumer.close()
 
     while True:
@@ -94,7 +93,6 @@ async def main(kafka_topic_, kafka_bootstrap_servers_):
                 print(f"Error sending message {message_kafka_dict['id']} to Kafka: {e}")
             producer.flush()
         last_processed_id = messages[-1].id
-        print(f'Last processed message id: {last_processed_id}')
 
     producer.close()
 
