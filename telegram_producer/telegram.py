@@ -29,7 +29,7 @@ async def main(kafka_topic_, kafka_bootstrap_servers_):
     print(f'Client created for {me.username} and {user_input_channel} (channel)')
 
     my_channel = await client.get_entity(user_input_channel)
-    limit = 150
+    limit = 1000
 
     producer = None
     consumer = None
@@ -42,7 +42,6 @@ async def main(kafka_topic_, kafka_bootstrap_servers_):
                 bootstrap_servers=kafka_bootstrap_servers_,
                 value_serializer=lambda v: json.dumps(v, cls=DateTimeEncoder).encode('utf-8')
             )
-            print("Connected to Kafka broker successfully.")
             break
         except errors.NoBrokersAvailable:
             print("No brokers available. Retrying in {} seconds...".format(retry_delay))
@@ -62,7 +61,6 @@ async def main(kafka_topic_, kafka_bootstrap_servers_):
                 bootstrap_servers=kafka_bootstrap_servers_,
                 value_deserializer=lambda x: json.loads(x.decode('utf-8')),
             )
-            print("Connected to Kafka broker successfully.")
             break
         except errors.NoBrokersAvailable:
             print("No brokers available. Retrying in {} seconds...".format(retry_delay))
@@ -71,20 +69,16 @@ async def main(kafka_topic_, kafka_bootstrap_servers_):
 
     last_processed_id = get_offset_id(consumer)
     consumer.close()
+    print(f'Last processed message id: {last_processed_id} (from Kafka)')
 
     while True:
-        history = await client(GetHistoryRequest(
-            peer=my_channel, max_id=0, limit=limit,
-            offset_id=last_processed_id + limit, offset_date=None, add_offset=0,
-            min_id=last_processed_id, hash=0
-        ))
-
-        if not history.messages:
+        history = await client.get_messages(my_channel, limit=limit, min_id=last_processed_id, reverse=True)
+        if not history:
             print('No messages, sleeping for 60 seconds...')
             time.sleep(60)
             continue
-        messages = history.messages[::-1]
-        for message in messages:
+
+        for message in history:
             message_kafka_dict = await process_message(message.to_dict(), client)
             try:
                 producer.send(kafka_topic_, message_kafka_dict)
@@ -92,12 +86,12 @@ async def main(kafka_topic_, kafka_bootstrap_servers_):
             except Exception as e:
                 print(f"Error sending message {message_kafka_dict['id']} to Kafka: {e}")
             producer.flush()
-        last_processed_id = messages[-1].id
+        last_processed_id = history[-1].id
 
     producer.close()
 
 
-with TelegramClient(StringSession(session_string), api_id, api_hash) as client:
+with TelegramClient(StringSession(session_string), api_id, api_hash, connection_retries=5) as client:
     kafka_topic = os.getenv('KAFKA_INPUT_TOPIC')
     kafka_bootstrap_servers = os.getenv('KAFKA_BOOTSTRAP_SERVERS')
     client.loop.run_until_complete(main(kafka_topic, kafka_bootstrap_servers))
