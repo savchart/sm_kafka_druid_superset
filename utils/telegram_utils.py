@@ -1,42 +1,4 @@
-import json
-from datetime import datetime
-
-
-
-class DateTimeEncoder(json.JSONEncoder):
-    def default(self, o):
-        if isinstance(o, datetime):
-            return o.isoformat()
-
-        if isinstance(o, bytes):
-            return list(o)
-
-        return json.JSONEncoder.default(self, o)
-
-
-def get_offset_id(consumer):
-    last_successful_offset = 0
-    consumer.poll(timeout_ms=100, max_records=1)
-    partition = list(consumer.assignment())[0]
-    end_offset = consumer.end_offsets([partition])
-    last_id = list(end_offset.values())[0]
-    if last_id == 0:
-        return last_successful_offset
-    consumer.seek(partition, last_id - 1)
-    last_successful_offset = next(consumer).value['id']
-
-    return last_successful_offset
-
-
-def flatten_json(nested_json, key_prefix=''):
-    flattened_dict = {}
-    for key, value in nested_json.items():
-        new_key = key_prefix + key
-        if isinstance(value, dict):
-            flattened_dict.update(flatten_json(value, new_key + '_'))
-        else:
-            flattened_dict[new_key] = value
-    return flattened_dict
+from utils.common_utils import flatten_json
 
 
 async def process_message(message_dict, client):
