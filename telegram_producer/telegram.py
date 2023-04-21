@@ -1,21 +1,20 @@
 import os
 import sys
-import json
 import time
 
-from telethon.sync import TelegramClient, events
+from telethon.sync import TelegramClient
 from telethon.sessions import StringSession
-from telethon.tl.functions.messages import GetHistoryRequest
 
-from kafka import KafkaProducer, KafkaConsumer, errors
+project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+sys.path.insert(0, project_root)
 
-from telegram_utils import DateTimeEncoder, process_message, get_offset_id
+from utils.telegram_utils import process_message
+from utils.common_utils import create_producer, create_consumer, get_offset_id
 
 from dotenv import load_dotenv
 
 load_dotenv()
-project_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.append(project_dir)
+
 
 api_id = int(os.getenv('API_ID'))
 api_hash = os.getenv('API_HASH')
@@ -31,44 +30,12 @@ async def main(kafka_topic_, kafka_bootstrap_servers_):
     my_channel = await client.get_entity(user_input_channel)
     limit = 1000
 
-    producer = None
-    consumer = None
-    retry_attempts = 5
-    retry_delay = 10
-
-    for _ in range(retry_attempts):
-        try:
-            producer = KafkaProducer(
-                bootstrap_servers=kafka_bootstrap_servers_,
-                value_serializer=lambda v: json.dumps(v, cls=DateTimeEncoder).encode('utf-8')
-            )
-            break
-        except errors.NoBrokersAvailable:
-            print("No brokers available. Retrying in {} seconds...".format(retry_delay))
-            time.sleep(retry_delay)
-    else:
-        print("Failed to connect to Kafka broker after {} attempts.".format(retry_attempts))
-        sys.exit(1)
-    print(f'Kafka producer created for {kafka_topic_} topic, {kafka_bootstrap_servers_} bootstrap servers')
-
-    for _ in range(retry_attempts):
-        try:
-            consumer = KafkaConsumer(
-                kafka_topic_,
-                group_id='my-group',
-                auto_offset_reset='latest',
-                enable_auto_commit=False,
-                bootstrap_servers=kafka_bootstrap_servers_,
-                value_deserializer=lambda x: json.loads(x.decode('utf-8')),
-            )
-            break
-        except errors.NoBrokersAvailable:
-            print("No brokers available. Retrying in {} seconds...".format(retry_delay))
-            time.sleep(retry_delay)
-    print(f'Kafka consumer created for {kafka_topic_} topic, {kafka_bootstrap_servers_} bootstrap servers')
+    producer = create_producer(kafka_topic_=kafka_topic_, kafka_bootstrap_servers_=kafka_bootstrap_servers_)
+    consumer = create_consumer(kafka_topic_=kafka_topic_, kafka_bootstrap_servers_=kafka_bootstrap_servers_)
 
     last_processed_id = get_offset_id(consumer)
     consumer.close()
+
     print(f'Last processed message id: {last_processed_id} (from Kafka)')
 
     while True:
