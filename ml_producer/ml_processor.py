@@ -4,10 +4,10 @@ from transformers import pipeline
 import os
 import sys
 
-project_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.append(project_dir)
+project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+sys.path.insert(0, project_root)
 
-from ml_utils import process_message_ml
+from utils.ml_utils import process_message_ml
 
 # Initialize sentiment analysis model
 model_path = "cardiffnlp/twitter-xlm-roberta-base-sentiment"

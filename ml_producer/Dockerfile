@@ -6,6 +6,7 @@ WORKDIR /app
 
 # Copy the current directory contents into the container at /app
 COPY ml_producer ml_producer
+COPY utils utils
 
 # Install any needed packages specified in requirements.txt
 RUN pip3 install --no-cache-dir -r ml_producer/requirements.txt
