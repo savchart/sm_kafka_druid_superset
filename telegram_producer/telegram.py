@@ -15,7 +15,6 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-
 api_id = int(os.getenv('API_ID'))
 api_hash = os.getenv('API_HASH')
 session_string = os.getenv('SESSION_STRING')
@@ -31,7 +30,8 @@ async def main(kafka_topic_, kafka_bootstrap_servers_):
     limit = 1000
 
     producer = create_producer(kafka_topic_=kafka_topic_, kafka_bootstrap_servers_=kafka_bootstrap_servers_)
-    consumer = create_consumer(kafka_topic_=kafka_topic_, kafka_bootstrap_servers_=kafka_bootstrap_servers_)
+    consumer = create_consumer(offset='latest', kafka_topic_=kafka_topic_,
+                               kafka_bootstrap_servers_=kafka_bootstrap_servers_)
 
     last_processed_id = get_offset_id(consumer)
     consumer.close()
@@ -59,6 +59,6 @@ async def main(kafka_topic_, kafka_bootstrap_servers_):
 
 
 with TelegramClient(StringSession(session_string), api_id, api_hash, connection_retries=5) as client:
-    kafka_topic = os.getenv('KAFKA_INPUT_TOPIC')
+    kafka_topic = os.getenv('TELEGRAM_INPUT_TOPIC')
     kafka_bootstrap_servers = os.getenv('KAFKA_BOOTSTRAP_SERVERS')
     client.loop.run_until_complete(main(kafka_topic, kafka_bootstrap_servers))

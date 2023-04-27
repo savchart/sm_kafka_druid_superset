@@ -15,8 +15,9 @@ load_dotenv()
 
 TOKEN = os.getenv('DISCORD_TOKEN')
 CHANNEL_ID = int(os.getenv('DISCORD_CHANNEL_ID'))
-KAFKA_DISCORD_TOPIC = os.getenv('KAFKA_DISCORD_INPUT_TOPIC')
+KAFKA_DISCORD_TOPIC = os.getenv('DISCORD_INPUT_TOPIC')
 KAFKA_BOOTSTRAP_SERVERS = os.getenv('KAFKA_BOOTSTRAP_SERVERS')
+DISCORD_EPOCH = 1420070400000
 
 
 def main(kafka_topic_, kafka_bootstrap_servers_):
@@ -25,31 +26,37 @@ def main(kafka_topic_, kafka_bootstrap_servers_):
         "Content-Type": "application/json"
     }
 
-    def get_messages(channel_id, last_message_id=None):
+    def get_messages(channel_id):
         messages_url = f"https://discord.com/api/v10/channels/{channel_id}/messages"
-        params = {"limit": 100}
-        if last_message_id:
-            params["after"] = last_message_id
+        params = {"limit": 100, "after": last_message_id}
         response = requests.get(messages_url, headers=headers, params=params)
         return response.json()
 
+    def first_mes_id(channel_id):
+        messages_url = f"https://discord.com/api/v10/channels/{channel_id}/messages"
+        timestamp_ms = int(time.mktime(time.strptime('2022-06-01', '%Y-%m-%d')) * 1000)
+        snowflake_id = (timestamp_ms - DISCORD_EPOCH) << 22
+        params = {"limit": 1, "after": snowflake_id}
+        response = requests.get(messages_url, headers=headers, params=params)
+        return response.json()[0]['id']
+
     producer = create_producer(kafka_topic_=kafka_topic_, kafka_bootstrap_servers_=kafka_bootstrap_servers_)
-    consumer = create_consumer(kafka_topic_=kafka_topic_, kafka_bootstrap_servers_=kafka_bootstrap_servers_)
+    consumer = create_consumer(offset='latest', kafka_topic_=kafka_topic_,
+                               kafka_bootstrap_servers_=kafka_bootstrap_servers_)
 
     last_processed_id = get_offset_id(consumer)
     consumer.close()
 
-    print(f'Last processed message id: {last_processed_id} (from Kafka)')
-
+    if last_processed_id == 0:
+        last_processed_id = first_mes_id(CHANNEL_ID)
     last_message_id = last_processed_id
-
+    print(f'Last processed message id: {last_message_id}')
     while True:
-        messages = get_messages(CHANNEL_ID, last_message_id)
+        messages = get_messages(CHANNEL_ID)[::-1]
         if not messages:
             print('No messages, sleeping for 60 seconds...')
             time.sleep(60)
             continue
-
         for message in messages:
             message_kafka_dict = process_message(message)
             try:

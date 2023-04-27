@@ -36,13 +36,13 @@ def create_producer(retry_attempts=5, retry_delay=10, kafka_topic_=None, kafka_b
     return producer
 
 
-def create_consumer(retry_attempts=5, retry_delay=10, kafka_topic_=None, kafka_bootstrap_servers_=None):
+def create_consumer(offset, retry_attempts=5, retry_delay=10, kafka_topic_=None, kafka_bootstrap_servers_=None):
     for _ in range(retry_attempts):
         try:
             consumer = KafkaConsumer(
                 kafka_topic_,
                 group_id='my-group',
-                auto_offset_reset='latest',
+                auto_offset_reset=offset,
                 enable_auto_commit=False,
                 bootstrap_servers=kafka_bootstrap_servers_,
                 value_deserializer=lambda x: json.loads(x.decode('utf-8')),

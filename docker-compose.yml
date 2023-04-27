@@ -1,4 +1,4 @@
-version: '3'
+version: '3.9'
 
 volumes:
   metadata_data: { }
@@ -23,9 +23,9 @@ services:
     volumes:
       - metadata_data:/var/lib/postgresql/data
     environment:
-        - POSTGRES_DB=druid
-        - POSTGRES_USER=druid
-        - POSTGRES_PASSWORD=FoolishPassword
+      - POSTGRES_DB=druid
+      - POSTGRES_USER=druid
+      - POSTGRES_PASSWORD=FoolishPassword
     networks:
       - zk-kafka-net
 
@@ -53,7 +53,7 @@ services:
     environment:
       - KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://kafka:9092
       - KAFKA_CFG_ZOOKEEPER_CONNECT=zookeeper:2181
-      - KAFKA_CREATE_TOPICS="telegram_messages:1:1"
+      - KAFKA_CREATE_TOPICS=telegram_messages:1:1,telegram_ml:1:1,discord_messages:1:1,discord_ml:1:1
       - ALLOW_PLAINTEXT_LISTENER=yes
     depends_on:
       zookeeper:
@@ -160,18 +160,30 @@ services:
       dockerfile: telegram_producer/Dockerfile
     container_name: telegram_producer
     depends_on:
-      zookeeper:
-        condition: service_started
       kafka:
         condition: service_started
-      broker:
+    deploy:
+      restart_policy:
+        condition: on-failure
+        max_attempts: 3
+
+    env_file:
+      - .env
+    networks:
+      - zk-kafka-net
+
+  discord-producer:
+    build:
+      context: .
+      dockerfile: discord_producer/Dockerfile
+    container_name: discord_producer
+    depends_on:
+      kafka:
         condition: service_started
-      middlemanager:
-        condition: service_started
-      historical:
-        condition: service_started
-      router:
-        condition: service_started
+    deploy:
+      restart_policy:
+        condition: on-failure
+        max_attempts: 3
 
     env_file:
       - .env
@@ -184,23 +196,17 @@ services:
       dockerfile: ./ml_producer/Dockerfile
     container_name: ml_producer
     depends_on:
-      zookeeper:
-        condition: service_started
       kafka:
         condition: service_started
-      broker:
-        condition: service_started
-      middlemanager:
-        condition: service_started
-      historical:
-        condition: service_started
-      router:
-        condition: service_started
-
+    deploy:
+      restart_policy:
+        condition: on-failure
+        max_attempts: 3
     env_file:
       - .env
     networks:
       - zk-kafka-net
+
 
   superset:
     image: apache/superset:latest
@@ -209,6 +215,15 @@ services:
       - "8088:8088"
     env_file:
       - env_superset
+#    command: >
+#      sh -c "superset fab create-admin \
+#             --username admin \
+#             --firstname Superset \
+#             --lastname Admin \
+#             --email admin@superset.com \
+#             --password admin && \
+#             superset db upgrade && \
+#             superset init"
     networks:
       - zk-kafka-net
 
