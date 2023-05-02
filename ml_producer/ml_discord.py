@@ -14,4 +14,4 @@ if __name__ == '__main__':
     discord_output_topic = os.getenv('DISCORD_ML_TOPIC')
 
     print(f"The discord input topic is {discord_input_topic}")
-    process_ml_messages(discord_input_topic, discord_output_topic, kafka_bootstrap_servers)
+    process_ml_messages(discord_input_topic, discord_output_topic, kafka_bootstrap_servers, 'offset_discord.txt')

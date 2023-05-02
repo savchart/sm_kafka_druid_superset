@@ -1,5 +1,6 @@
 from transformers import pipeline
 from utils.common_utils import create_producer, create_consumer
+import os
 
 # Initialize sentiment analysis model
 model_path = "cardiffnlp/twitter-xlm-roberta-base-sentiment"
@@ -29,10 +30,16 @@ def process_message_ml(msg, sentiment_task_, classifier_):
     return msg
 
 
-def process_ml_messages(kafka_input_topic, kafka_output_topic, kafka_bootstrap_servers_):
+def process_ml_messages(kafka_input_topic, kafka_output_topic, kafka_bootstrap_servers_, offset_file_path='offset.txt'):
+    last_processed_offset = None
+    if os.path.exists(offset_file_path):
+        with open(offset_file_path, 'r') as f:
+            last_processed_offset = int(f.read().strip())
     consumer = create_consumer(offset='earliest', kafka_topic_=kafka_input_topic,
                                kafka_bootstrap_servers_=kafka_bootstrap_servers_)
     producer = create_producer(kafka_topic_=kafka_output_topic, kafka_bootstrap_servers_=kafka_bootstrap_servers_)
+
+
 
     # Polling interval in milliseconds
     poll_interval = 1000

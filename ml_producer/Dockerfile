@@ -14,4 +14,4 @@ COPY ml_producer ml_producer
 COPY utils utils
 
 # Run ml_telegram.py when the container launches
-CMD ["python3", "-u", "ml_producer/start.py"]
+CMD ["./ml_producer/run.sh"]

@@ -10,5 +10,6 @@ def process_message(message_dict):
     ]
     for field in filter_fields:
         kafka_message_dict[field] = message_flat.get(field, None)
+    kafka_message_dict['message'] = kafka_message_dict.pop('content', None)
 
     return kafka_message_dict
