@@ -11,7 +11,9 @@ COPY ml_producer/requirements.txt .
 RUN pip3 install --no-cache-dir -r requirements.txt
 
 COPY ml_producer ml_producer
-COPY utils utils
+COPY utils/common_utils.py utils/common_utils.py
+COPY utils/ml_utils.py utils/ml_utils.py
+COPY utils/model_utils.py utils/model_utils.py
 
 # Run ml_telegram.py when the container launches
 CMD ["./ml_producer/run.sh"]

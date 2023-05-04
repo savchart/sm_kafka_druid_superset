@@ -1,9 +1,12 @@
+import os
 import sys
 import time
 import json
 from datetime import datetime
 
 from kafka import KafkaProducer, KafkaConsumer, errors
+
+OFFSET_FILE = "last_offset.txt"
 
 
 class DateTimeEncoder(json.JSONEncoder):
@@ -43,7 +46,8 @@ def create_consumer(offset, retry_attempts=5, retry_delay=10, kafka_topic_=None,
                 kafka_topic_,
                 group_id='my-group',
                 auto_offset_reset=offset,
-                enable_auto_commit=False,
+                enable_auto_commit=True,
+                auto_commit_interval_ms=10000,
                 bootstrap_servers=kafka_bootstrap_servers_,
                 value_deserializer=lambda x: json.loads(x.decode('utf-8')),
             )
@@ -59,7 +63,11 @@ def create_consumer(offset, retry_attempts=5, retry_delay=10, kafka_topic_=None,
 def get_offset_id(consumer):
     last_successful_offset = 0
     consumer.poll(timeout_ms=100, max_records=1)
-    partition = list(consumer.assignment())[0]
+    partition = consumer.assignment()
+    print(f"partition: {partition}")
+    if not partition:
+        return last_successful_offset
+    partition = list(partition)[0]
     end_offset = consumer.end_offsets([partition])
     last_id = list(end_offset.values())[0]
     if last_id == 0:
@@ -68,6 +76,20 @@ def get_offset_id(consumer):
     last_successful_offset = next(consumer).value['id']
 
     return last_successful_offset
+
+
+def read_offset():
+    if os.path.exists(OFFSET_FILE):
+        with open(OFFSET_FILE, "r") as f:
+            last_offset = f.read().strip()
+            return int(last_offset) if last_offset else 'earliest'
+    else:
+        return 'earliest'
+
+
+def store_offset(offset):
+    with open(OFFSET_FILE, "w") as f:
+        f.write(str(offset))
 
 
 def flatten_json(nested_json, key_prefix=''):

@@ -14,4 +14,4 @@ if __name__ == '__main__':
 
     # Read environment variables for discord channel
     print(f"The telegram input topic is {telegram_input_topic}")
-    process_ml_messages(telegram_input_topic, telegram_output_topic, kafka_bootstrap_servers, 'offset_telegram.txt')
+    process_ml_messages(telegram_input_topic, telegram_output_topic, kafka_bootstrap_servers)

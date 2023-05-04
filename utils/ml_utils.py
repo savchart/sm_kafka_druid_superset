@@ -1,13 +1,5 @@
-from transformers import pipeline
-from utils.common_utils import create_producer, create_consumer
-import os
-
-# Initialize sentiment analysis model
-model_path = "cardiffnlp/twitter-xlm-roberta-base-sentiment"
-sentiment_task = pipeline("sentiment-analysis", model=model_path, tokenizer=model_path)
-
-# Initialize emotion classification model
-classifier = pipeline("text-classification", model="j-hartmann/emotion-english-distilroberta-base", top_k=None)
+from utils.common_utils import create_producer, create_consumer, store_offset, read_offset
+from utils.model_utils import sentiment_task, classifier
 
 def process_message_ml(msg, sentiment_task_, classifier_):
     # Truncate the message if it's too long for the model
@@ -30,16 +22,11 @@ def process_message_ml(msg, sentiment_task_, classifier_):
     return msg
 
 
-def process_ml_messages(kafka_input_topic, kafka_output_topic, kafka_bootstrap_servers_, offset_file_path='offset.txt'):
-    last_processed_offset = None
-    if os.path.exists(offset_file_path):
-        with open(offset_file_path, 'r') as f:
-            last_processed_offset = int(f.read().strip())
-    consumer = create_consumer(offset='earliest', kafka_topic_=kafka_input_topic,
+def process_ml_messages(kafka_input_topic, kafka_output_topic, kafka_bootstrap_servers_):
+    last_offset = read_offset()
+    consumer = create_consumer(offset=last_offset, kafka_topic_=kafka_input_topic,
                                kafka_bootstrap_servers_=kafka_bootstrap_servers_)
     producer = create_producer(kafka_topic_=kafka_output_topic, kafka_bootstrap_servers_=kafka_bootstrap_servers_)
-
-
 
     # Polling interval in milliseconds
     poll_interval = 1000
@@ -59,5 +46,6 @@ def process_ml_messages(kafka_input_topic, kafka_output_topic, kafka_bootstrap_s
                 try:
                     producer.send(kafka_output_topic, processed_msg)
                     print(f"Message {processed_msg['id']} sent to {kafka_output_topic}")
+                    store_offset(message.offset)
                 except Exception as e:
                     print(f"Error sending message {processed_msg['id']} to Kafka: {e}")
