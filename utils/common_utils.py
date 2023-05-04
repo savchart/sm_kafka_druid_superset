@@ -62,12 +62,15 @@ def create_consumer(offset, retry_attempts=5, retry_delay=10, kafka_topic_=None,
 
 def get_offset_id(consumer):
     last_successful_offset = 0
-    consumer.poll(timeout_ms=100, max_records=1)
-    partition = consumer.assignment()
-    print(f"partition: {partition}")
-    if not partition:
-        return last_successful_offset
-    partition = list(partition)[0]
+    partition = None
+    for _ in range(5):
+        try:
+            consumer.poll(timeout_ms=100, max_records=1)
+            partition = consumer.assignment()
+            partition = list(partition)[0]
+            break
+        except errors.KafkaTimeoutError:
+            time.sleep(10)
     end_offset = consumer.end_offsets([partition])
     last_id = list(end_offset.values())[0]
     if last_id == 0:
@@ -76,20 +79,6 @@ def get_offset_id(consumer):
     last_successful_offset = next(consumer).value['id']
 
     return last_successful_offset
-
-
-def read_offset():
-    if os.path.exists(OFFSET_FILE):
-        with open(OFFSET_FILE, "r") as f:
-            last_offset = f.read().strip()
-            return int(last_offset) if last_offset else 'earliest'
-    else:
-        return 'earliest'
-
-
-def store_offset(offset):
-    with open(OFFSET_FILE, "w") as f:
-        f.write(str(offset))
 
 
 def flatten_json(nested_json, key_prefix=''):
