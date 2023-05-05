@@ -29,7 +29,7 @@ def main(kafka_topic_, kafka_bootstrap_servers_):
     def get_messages(channel_id):
         messages_url = f"https://discord.com/api/v10/channels/{channel_id}/messages"
         params = {"limit": 100, "after": last_message_id}
-        response = requests.get(messages_url, headers=headers, params=params)
+        response = requests.get(messages_url, headers=headers, params=params, verify=False)
         return response.json()
 
     def first_mes_id(channel_id):
@@ -37,7 +37,7 @@ def main(kafka_topic_, kafka_bootstrap_servers_):
         timestamp_ms = int(time.mktime(time.strptime('2022-06-01', '%Y-%m-%d')) * 1000)
         snowflake_id = (timestamp_ms - DISCORD_EPOCH) << 22
         params = {"limit": 1, "after": snowflake_id}
-        response = requests.get(messages_url, headers=headers, params=params)
+        response = requests.get(messages_url, headers=headers, params=params, verify=False)
         return response.json()[0]['id']
 
     producer = create_producer(kafka_topic_=kafka_topic_, kafka_bootstrap_servers_=kafka_bootstrap_servers_)
