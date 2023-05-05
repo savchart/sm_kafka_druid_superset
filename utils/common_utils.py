@@ -67,10 +67,10 @@ def get_offset_id(consumer):
         try:
             consumer.poll(timeout_ms=100, max_records=1)
             partition = consumer.assignment()
-            partition = list(partition)[0]
             break
         except errors.KafkaTimeoutError:
             time.sleep(10)
+    partition = list(partition)[0]
     end_offset = consumer.end_offsets([partition])
     last_id = list(end_offset.values())[0]
     if last_id == 0:

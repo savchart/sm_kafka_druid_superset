@@ -1,6 +1,7 @@
 from utils.common_utils import create_producer, create_consumer, get_offset_id
 from utils.model_utils import sentiment_task, classifier
 
+
 def process_message_ml(msg, sentiment_task_, classifier_):
     # Truncate the message if it's too long for the model
     max_length = 428  # This may vary depending on the model
@@ -24,14 +25,7 @@ def process_message_ml(msg, sentiment_task_, classifier_):
 
 def process_ml_messages(kafka_input_topic, kafka_output_topic, kafka_bootstrap_servers_):
     producer = create_producer(kafka_topic_=kafka_output_topic, kafka_bootstrap_servers_=kafka_bootstrap_servers_)
-    sync_consumer = create_consumer(offset='latest', kafka_topic_=kafka_output_topic,
-                                    kafka_bootstrap_servers_=kafka_bootstrap_servers_)
-    last_offset = get_offset_id(sync_consumer)
-    sync_consumer.close()
-    if last_offset == 0:
-        last_offset = 'earliest'
-
-    consumer = create_consumer(offset=last_offset, kafka_topic_=kafka_input_topic,
+    consumer = create_consumer(offset='earliest', kafka_topic_=kafka_input_topic,
                                kafka_bootstrap_servers_=kafka_bootstrap_servers_)
 
     # Polling interval in milliseconds
@@ -54,3 +48,6 @@ def process_ml_messages(kafka_input_topic, kafka_output_topic, kafka_bootstrap_s
                     print(f"Message {processed_msg['id']} sent to {kafka_output_topic}")
                 except Exception as e:
                     print(f"Error sending message {processed_msg['id']} to Kafka: {e}")
+                producer.flush()
+        # Commit offsets
+        consumer.commit()
