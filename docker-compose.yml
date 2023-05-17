@@ -15,6 +15,10 @@ volumes:
   superset_data:
     driver: local
 
+networks:
+  zk-kafka-net:
+    driver: bridge
+
 
 services:
   postgres:
@@ -193,19 +197,19 @@ services:
   ml-producer:
     build:
       context: .
-      dockerfile: ./ml_producer/Dockerfile
+      dockerfile: ml_producer/Dockerfile
     container_name: ml_producer
     depends_on:
       kafka:
         condition: service_started
     deploy:
-      restart_policy:
-        condition: on-failure
-        max_attempts: 3
+        restart_policy:
+            condition: on-failure
+            max_attempts: 3
     env_file:
-      - .env
+        - .env
     networks:
-      - zk-kafka-net
+        - zk-kafka-net
 
 
   superset:
@@ -215,19 +219,5 @@ services:
       - "8088:8088"
     env_file:
       - env_superset
-#    command: >
-#      sh -c "superset fab create-admin \
-#             --username admin \
-#             --firstname Superset \
-#             --lastname Admin \
-#             --email admin@superset.com \
-#             --password admin && \
-#             superset db upgrade && \
-#             superset init"
     networks:
       - zk-kafka-net
-
-
-networks:
-  zk-kafka-net:
-    driver: bridge
