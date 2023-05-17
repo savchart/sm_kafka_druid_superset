@@ -29,9 +29,9 @@ async def main(kafka_topic_, kafka_bootstrap_servers_):
     my_channel = await client.get_entity(user_input_channel)
     limit = 1000
 
-    producer = create_producer(kafka_topic_=kafka_topic_, kafka_bootstrap_servers_=kafka_bootstrap_servers_)
-    consumer = create_consumer(offset='latest', kafka_topic_=kafka_topic_,
-                               kafka_bootstrap_servers_=kafka_bootstrap_servers_)
+    producer = create_producer(kafka_bootstrap_servers_=kafka_bootstrap_servers_)
+    consumer = create_consumer(kafka_topic_=kafka_topic_,
+                               kafka_bootstrap_servers_=kafka_bootstrap_servers_, group_id='telegram_group')
 
     last_processed_id = get_offset_id(consumer)
     consumer.close()
