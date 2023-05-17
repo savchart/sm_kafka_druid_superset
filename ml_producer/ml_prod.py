@@ -17,7 +17,10 @@ classifier = pipeline("text-classification", model="j-hartmann/emotion-english-d
 
 def process_messages_ml(msgs_, sentiment_task_, classifier_):
     processed_msgs_ = []
+    min_length = 10
     for msg in msgs_:
+        if msg is None or msg['message'] is None or len(msg['message']) < min_length:
+            continue
         max_length = 428  # This may vary depending on the model
         truncated_message = msg['message'][:max_length]
 
@@ -53,7 +56,6 @@ if __name__ == '__main__':
 
     # Polling interval in milliseconds
     poll_interval = 1200
-    min_length = 10
 
     # Infinite loop for processing messages
     while True:
