@@ -40,9 +40,9 @@ def main(kafka_topic_, kafka_bootstrap_servers_):
         response = requests.get(messages_url, headers=headers, params=params, verify=False)
         return response.json()[0]['id']
 
-    producer = create_producer(kafka_topic_=kafka_topic_, kafka_bootstrap_servers_=kafka_bootstrap_servers_)
+    producer = create_producer(kafka_bootstrap_servers_=kafka_bootstrap_servers_)
     consumer = create_consumer(offset='latest', kafka_topic_=kafka_topic_,
-                               kafka_bootstrap_servers_=kafka_bootstrap_servers_)
+                               kafka_bootstrap_servers_=kafka_bootstrap_servers_, group_id='discord_group')
 
     last_processed_id = get_offset_id(consumer)
     consumer.close()
